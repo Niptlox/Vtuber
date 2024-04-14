@@ -3,7 +3,7 @@ import pygame.camera
 
 print(pygame.camera.get_backends())
 pygame.init()
-pygame.camera.init("VideoCapture")
+pygame.camera.init()
 screen = pygame.display.set_mode((640, 480))
 pygame.display.set_caption("Pygame Camera View")
 cam = pygame.camera.Camera()

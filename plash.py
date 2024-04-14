@@ -12,7 +12,7 @@ background = 0 #background that I have to display when I have the cloth on mysel
 for i in range(60): #30 iteration to capture the background
     ret, background = videoCap.read()
 
-while(videoCap.isOpened()):
+while 1:
     ret, img = videoCap.read()
 
     if not ret:

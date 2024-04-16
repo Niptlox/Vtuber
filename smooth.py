@@ -20,6 +20,8 @@ def smoothListGaussian(list, degree=5):
 
 
 def np_smooth(arr, cof=4):
+    if cof == 1:
+        return arr
     n = len(arr)
     x = np.arange(0, n)
     tck = splrep(x, arr, s=0)

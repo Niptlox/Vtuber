@@ -1,8 +1,20 @@
+import time
+from random import shuffle
+
 import cv2
 import mediapipe as mp
-from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LIPS, FACEMESH_LEFT_EYE, FACEMESH_LEFT_EYEBROW, \
-    FACEMESH_RIGHT_EYE, FACEMESH_RIGHT_EYEBROW, FACEMESH_FACE_OVAL, FACEMESH_NOSE, FACEMESH_RIGHT_IRIS, \
-    FACEMESH_LEFT_IRIS, FACEMESH_IRISES
+
+ABRAKADABRA = False
+
+if ABRAKADABRA:
+    from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_EYE, FACEMESH_LEFT_EYEBROW, \
+        FACEMESH_RIGHT_EYE, FACEMESH_RIGHT_EYEBROW, FACEMESH_FACE_OVAL, FACEMESH_NOSE, FACEMESH_RIGHT_IRIS, \
+        FACEMESH_LEFT_IRIS
+    from face_mesh_connections import _LIP_TOP as LIP_TOP, _LIP_BOTTOM as LIP_BOTTOM
+else:
+    from face_mesh_connections import FACEMESH_LEFT_EYE, FACEMESH_LEFT_EYEBROW, \
+        FACEMESH_RIGHT_EYE, FACEMESH_RIGHT_EYEBROW, FACEMESH_FACE_OVAL, FACEMESH_NOSE, FACEMESH_RIGHT_IRIS, \
+        FACEMESH_LEFT_IRIS, LIP_TOP, LIP_BOTTOM
 
 # Face Mesh
 mp_draw = mp.solutions.drawing_utils
@@ -11,23 +23,8 @@ face_mesh = mp_face_mesh.FaceMesh(static_image_mode=False,
                                   max_num_faces=1,
                                   refine_landmarks=True,
                                   min_detection_confidence=0.5)
-
-LIP_TOP = frozenset([(61, 185), (185, 40), (40, 39), (39, 37),
-                     (37, 0), (0, 267), (267, 269), (269, 270), (270, 409), (409, 291),
-
-                     (78, 191), (191, 80), (80, 81), (81, 82),
-                     (82, 13), (13, 312), (312, 311), (311, 310),
-                     (310, 415), (415, 308),
-                     ])
-
-LIP_BOTTOM = frozenset([(61, 146), (146, 91), (91, 181), (181, 84), (84, 17),
-                        (17, 314), (314, 405), (405, 321), (321, 375), (375, 291),
-
-
-                        (78, 95), (95, 88), (88, 178), (178, 87), (87, 14),
-                        (14, 317), (317, 402), (402, 318), (318, 324), (324, 308),
-
-                        ])
+_img = cv2.imread("img.jpg")
+DEBUG_CAM_IS_IMG = False
 
 
 def get_face_points(image):
@@ -36,17 +33,49 @@ def get_face_points(image):
     return face_mesh.process(rgb_image)
 
 
-contours = (LIP_TOP, LIP_BOTTOM, FACEMESH_LEFT_EYE, FACEMESH_RIGHT_EYE, FACEMESH_LEFT_EYEBROW,
-            FACEMESH_RIGHT_EYEBROW, FACEMESH_FACE_OVAL, FACEMESH_NOSE, FACEMESH_LEFT_IRIS, FACEMESH_RIGHT_IRIS)
+def shuffle_contours():
+    global contours
+    for x in contours:
+        shuffle(x)
 
 
-def get_face_mash(image):
+contours = [FACEMESH_FACE_OVAL, LIP_TOP, LIP_BOTTOM, FACEMESH_LEFT_EYE, FACEMESH_RIGHT_EYE, FACEMESH_LEFT_EYEBROW,
+            FACEMESH_RIGHT_EYEBROW, FACEMESH_NOSE, FACEMESH_LEFT_IRIS, FACEMESH_RIGHT_IRIS]
+
+
+# contours_lines = []
+# for contour in contours:
+#     d = dict(contour)
+#     lines = []
+#     line = []
+#     for i in range(len(contour) - 1):
+#         k1, k2 = contour[i]
+#         line.append(k1)
+#         if contour[i + 1][0] != k2:
+#             if k2 in d:
+#                 line.append(d[k2])
+#             lines.append(line)
+#             line = []
+#         else:
+#             k = k2
+#     if line:
+#         lines.append(line)  # edit
+#     print(lines)
+#
+
+# exit()
+
+def get_face_mash(image, get_all_points=False):
     result = get_face_points(image)
     if result.multi_face_landmarks:
         mfl0 = list(result.multi_face_landmarks)[0]
         # print(len(list(mfl0.landmark)))
         res = [[(mfl0.landmark[i1], mfl0.landmark[i2]) for i1, i2 in fig] for fig in contours]
+        if get_all_points:
+            return res, mfl0.landmark
         return res
+    if get_all_points:
+        return [[]], None
     return [[]]
 
 
@@ -76,17 +105,22 @@ def close_cam(vid):
     vid.release()
 
 
-def get_cam_size(vid):
+def get_frame(vid):
+    if DEBUG_CAM_IS_IMG:
+        return _img
     ret, frame = vid.read()
-    # frame = cv2.imread("img.jpg")
+    return frame
+
+
+def get_cam_size(vid):
+    frame = get_frame(vid)
     height, width, _ = frame.shape
     return width, height
 
 
-def get_face_mesh_from_cam(vid):
-    ret, frame = vid.read()
-    # frame = cv2.imread("img.jpg")
-    res = get_face_mash(frame)
+def get_face_mesh_from_cam(vid, get_all_points=False):
+    frame = get_frame(vid)
+    res = get_face_mash(frame, get_all_points=get_all_points)
     return res
 
 
@@ -99,9 +133,11 @@ def draw_points_face(vid):
 
     if result.multi_face_landmarks:
         mfl0 = list(result.multi_face_landmarks)[0]
-        for p in mfl0.landmark:
-            cv2.circle(frame, (int(p.x * width), int(p.y * height)), 1, (0, 0, 0), 2)
 
+        for i, p in enumerate(mfl0.landmark):
+            pos = int(p.x * width), int(p.y * height)
+            cv2.circle(frame, pos, 1, (0, 0, 0), 2)
+            cv2.putText(frame, str(i), pos, 0, 0.3, (0, 200, 0))
         # mp_drawing.draw_landmarks(
         #     image=frame,
         #     landmark_list=mfl0,
@@ -113,19 +149,42 @@ def draw_points_face(vid):
 
 
 if __name__ == '__main__':
-    if 0:
+    DEBUG_CAM_IS_IMG = True
+    TYP = 1
+    t = time.time()
+    if TYP == 0:
         cam = init_cam()
         while 1:
             _, img = cam.read()
             res = get_face_mesh_from_cam(cam)
-            draw_contours(img, res)
+            # draw_contours(img, res)
+            s = time.time() - t
+            print(s, 1 / s)
+            t = time.time()
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         cv2.destroyAllWindows()
-    elif 2:
+    elif TYP == 1:
         cam = init_cam()
         while 1:
             draw_points_face(cam)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        cv2.destroyAllWindows()
+    elif TYP == 2:
+        cam = init_cam()
+        mp_drawing = mp.solutions.drawing_utils
+        while 1:
+            frame = get_frame(cam)
+            result = get_face_points(frame)
+            if result.multi_face_landmarks:
+                mfl0 = list(result.multi_face_landmarks)[0]
+                mp_drawing.draw_landmarks(
+                    image=frame,
+                    landmark_list=mfl0,
+                    connections=mp_face_mesh.FACEMESH_TESSELATION, )
+            cv2.imshow("Frame", frame)
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         cv2.destroyAllWindows()

@@ -1,9 +1,12 @@
+from typing import NamedTuple
+
 import pygame, time
 from pygame._sdl2 import Window
 import win32api
 import win32con
 import win32gui
 import face_mesh
+
 from smooth import np_smooth
 
 colorkey = (255, 0, 255)  # Transparency color
@@ -36,7 +39,6 @@ win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
 
 
 # --------
-
 
 def set_flag(flag):
     global screen
@@ -77,8 +79,8 @@ def smooth_line(points):
         #             ================
     rx = [p[0] for p in r]
     ry = [p[1] for p in r]
-    rxs = np_smooth(rx, SPLINE_COF)
-    rys = np_smooth(ry, SPLINE_COF)
+    rxs = np_smooth(rx, SPLINE_COF, -0.2, abra=True)
+    rys = np_smooth(ry, SPLINE_COF, -0.2, abra=True)
     r = list(zip(rxs, rys))
     return [(r[i - 1], r[i]) for i in range(1, len(r))]
 
@@ -86,15 +88,21 @@ def smooth_line(points):
 def draw_face(surface):
     # surface.fill(colorkey)  # Transparent background
     width, height = SIZE
-    figures, all_points = face_mesh.get_face_mesh_from_cam(cam, get_all_points=True)
-    face_state = check_face_state(all_points)
+    face = face_mesh.get_face(cam)
+
     gray = (230, 240, 240)
     colors = "blue", gray, gray, "red", "red", "green", "yellow", "purple", "lightblue", "lightblue"
     # colors = (10, 10, 10), (10, 10, 10), (10, 10, 10), (10, 10, 10), (10, 10, 10), (10, 10, 10), \
     #     (10, 10, 10), (200, 200, 200), (200, 200, 200)
     a = 2
-    for color, points in zip(colors, figures):
+    i = 0
+    for color, points in zip(colors, face.contours):
         # print(color, len(points))
+        color = pygame.color.Color(color)
+        if i == 8 and face.state.left_eye_closed:
+            color.a = 250 * face.state.left_eye_cof
+        if i == 9 and face.state.right_eye_closed:
+            color.a = 250 * face.state.right_eye_cof
         color2 = color
         points = smooth_line(points)
         # print(color, len(points))
@@ -103,20 +111,16 @@ def draw_face(surface):
             y = int(pt1[1] * height)
             x2 = width - int(pt2[0] * width)
             y2 = int(pt2[1] * height)
-            pygame.draw.line(surface, color2, (x + a, y), (x2 + a, y2), 3)
+            pygame.draw.line(surface, color2, (x + a, y), (x2 + a, y2), 2)
             pygame.draw.line(surface, color2, (x, y - a), (x2, y2 - a), 1)
             pygame.draw.line(surface, color2, (x - a, y), (x2 - a, y2), 2)
             pygame.draw.line(surface, color2, (x, y + a), (x2, y2 + a), 1)
-            pygame.draw.line(surface, color, (x, y), (x2, y2), 4)
+            pygame.draw.line(surface, color, (x, y), (x2, y2), 3)
 
             # pygame.display.update()
             # pygame.event.get()
             # time.sleep(0.01)
-
-
-def check_face_state(all_points):
-    TOP = 10
-    BOTTOM = 152
+        i += 1
 
 
 screen.set_colorkey(colorkey)

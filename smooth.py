@@ -1,3 +1,5 @@
+import random
+
 import numpy
 import numpy as np
 from scipy.interpolate import splrep, BSpline
@@ -19,13 +21,16 @@ def smoothListGaussian(list, degree=5):
     return smoothed
 
 
-def np_smooth(arr, cof=4):
+def np_smooth(arr: list, cof=4, pass_len=0, abra=False):
     if cof == 1:
         return arr
+    if abra:
+        arr.append(arr[-1]+random.random()/500)
     n = len(arr)
+
     x = np.arange(0, n)
     tck = splrep(x, arr, s=0)
-    xnew = np.arange(0, n-1, 1 / cof)
+    xnew = np.arange(0, n-1+1/cof-pass_len, 1 / cof)
     return BSpline(*tck)(xnew)
 
 

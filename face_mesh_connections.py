@@ -13,6 +13,22 @@
 # limitations under the License.
 """MediaPipe FaceMesh connections."""
 
+NUM_TOP = 10
+NUM_BOTTOM = 152
+NUM_LEFT_EYE_TOP = 386
+NUM_LEFT_EYE_BOTTOM = 374
+NUM_RIGHT_EYE_TOP = 159
+NUM_RIGHT_EYE_BOTTOM = 145
+NUM_LEFT_IRIR_TOP = 475
+NUM_LEFT_IRIS_BOTTOM = 477
+NUM_RIGHT_IRIS_TOP = 470
+NUM_RIGHT_IRIS_BOTTOM = 472
+
+NUP_LIP_TOP_TOP = 0
+NUP_LIP_TOP_BOTTOM = 13
+NUP_LIP_BOTTOM_TOP = 14
+NUP_LIP_BOTTOM_BOTTOM = 17
+
 LIP_TOP = ([(61, 185), (185, 40), (40, 39), (39, 37),  # out
             (37, 0), (0, 267), (267, 269), (269, 270), (270, 409), (409, 291),
 
@@ -58,6 +74,7 @@ FACEMESH_LEFT_EYE = ([(263, 249), (249, 390), (390, 373), (373, 374),
 
 FACEMESH_LEFT_IRIS = ([(474, 475), (475, 476), (476, 477),
                        (477, 474), (474, 475)])
+NUMS_OF_LEFT_IRIS = (474, 475, 476, 477)
 
 FACEMESH_LEFT_EYEBROW = ([(276, 283), (283, 282), (282, 295),
                           (295, 285), (300, 293), (293, 334),
@@ -73,6 +90,8 @@ FACEMESH_RIGHT_EYEBROW = ([(46, 53), (53, 52), (52, 65), (65, 55),
 
 FACEMESH_RIGHT_IRIS = ([(469, 470), (470, 471), (471, 472),
                         (472, 469), (469, 470)])
+
+NUMS_OF_RIGHT_IRIS = (469, 470, 471, 472)
 
 FACEMESH_FACE_OVAL = ([(10, 338), (338, 297), (297, 332), (332, 284),
                        (284, 251), (251, 389), (389, 356), (356, 454),

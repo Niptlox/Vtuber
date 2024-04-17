@@ -8,11 +8,12 @@ delta_rotation = math.pi / 18
 
 NUMPY_POINT = False
 
-SHOW_EDGES = True
+SHOW_EDGES = False
 SHOW_POINTS = False
 SHOW_POINTS |= SHOW_EDGES
 SHOW_POLYGONS = True
 SHOW_NORMALS = False
+IGNOR_NORMAL = False
 
 MIN_LIGHT = 35
 
@@ -623,6 +624,11 @@ class MatrixRotation3:
             # return mul_vector_matrix(mul_vector_matrix(mul_vector_matrix(other, self._matrixes[0]), self._matrixes[1]), self._matrixes[2])
 
 
+def create_normal(p0: Vector3, p1, p2):
+    # print(p0, p1, p2, "====", (p1 - p0).cross(p2-p0))
+    return (p1 - p0).cross(p2-p0)
+
+
 def get_color_of_light(color, light):
     return max(MIN_LIGHT, min(255, color[0] * light)), max(MIN_LIGHT, min(255, color[1] * light)), \
         max(MIN_LIGHT, min(255, color[2] * light))
@@ -805,9 +811,10 @@ class Object3d(None3D):
         if not faces:
             self.polygons = []
         elif isinstance(faces[0][0], int):
+            # elif self.normals:
             self.polygons = [Polygon(self, [self.points[i] for i in face], normal=normal, flag=POLYGON_FLAG_HAVE_NORMAL)
                              for face, normal in zip(self.faces, self.normals)]
-            print(self.faces, self.normals)
+            # print(self.faces, self.normals)
         elif len(faces[0][0]) == 3:
             self.polygons = [Polygon(self, [self.points[p[0]] for p in face], normal=self.normals[face[0][2]],
                                      flag=POLYGON_FLAG_HAVE_NORMAL) for face in self.faces]
@@ -899,36 +906,6 @@ class Surface3dMonocolor(Surface3d):
         self.alpha = alpha
 
 
-class FlatSurface3d(Surface3d):
-    def __init__(self, owner, polygons=[], normal=None):
-        super(FlatSurface3d, self).__init__(owner, polygons)
-        if normal == None:
-            normal = polygons[0].create_normal()
-        self.normal = normal
-
-    def is_show(self):
-        ##        point =
-        return
-
-    # def get_map_xyz(self):
-    #
-    #     return position
-
-    # def get_screen_xy(self):
-    #
-    #     r_matrix = pg.struct_3d["rm"]
-    #     o_xyz = pg.struct_3d["O"]
-    #     x, y = xy
-    #     z *= pg.scale
-    #     v_xyz = sum_vectors(mul_vector_matrix((x, y, z), r_matrix), o_xyz)
-    #     x, y, z = v_xyz
-    #     K = self.focus / (self.focus + z)
-    #     x, y = (int(x * K)+self.offset_x, int(y * K)+self.offset_x)
-    #     if 0 <= x <= self.width and 0 <= y <= self.height:
-    #         return (x, y)
-    #     return None
-
-
 class Polygon:
     def __init__(self, owner, points: List[VertexPoint], flag=0, normal=(0, 0, 0)):
         self.owner = owner
@@ -963,7 +940,7 @@ class Polygon:
             if self.owner.flag & OBJECT_FLAG_MOVING:
                 self.update_normal()
             # print(self.normal, vec, vec.dot(self.normal))
-            if vec.dot(self.normal) < 0:
+            if vec.dot(self.normal) < 0 or IGNOR_NORMAL:
                 self.flag |= OBJECT_FLAG_VISIBLE
                 camera.polygons.add(self)
 
@@ -980,6 +957,36 @@ class Polygon:
                 self._center_point.show(camera, lamps, color="green")
                 draw_line(camera, "red", self._center_point.position2d_on_camera,
                           self._init_normal_point.position2d_on_camera)
+
+
+class FlatSurface3d(Surface3d):
+    def __init__(self, owner, polygons: List[Polygon] = [], normal=None):
+        super(FlatSurface3d, self).__init__(owner, polygons)
+        if normal == None:
+            normal = polygons[0].update_normal()
+        self.normal = normal
+
+    def is_show(self):
+        ##        point =
+        return
+
+    # def get_map_xyz(self):
+    #
+    #     return position
+
+    # def get_screen_xy(self):
+    #
+    #     r_matrix = pg.struct_3d["rm"]
+    #     o_xyz = pg.struct_3d["O"]
+    #     x, y = xy
+    #     z *= pg.scale
+    #     v_xyz = sum_vectors(mul_vector_matrix((x, y, z), r_matrix), o_xyz)
+    #     x, y, z = v_xyz
+    #     K = self.focus / (self.focus + z)
+    #     x, y = (int(x * K)+self.offset_x, int(y * K)+self.offset_x)
+    #     if 0 <= x <= self.width and 0 <= y <= self.height:
+    #         return (x, y)
+    #     return None
 
 
 def convert_faces_to_lines(faces):
@@ -1121,7 +1128,7 @@ class CameraPolygons:
 
 
 class Camera(None3D):
-    def __init__(self, owner, scene, surface: pg.Surface, position: Vector3, rotation: Vector3,
+    def __init__(self, owner, scene: Scene3D, surface: pg.Surface, position: Vector3, rotation: Vector3,
                  fov: float = 3.14159 / 3, background=BLACK):
         super().__init__(owner, Vector3(position), flag=0)
         self.surface = surface

@@ -5,9 +5,11 @@ from pygame import Vector2
 
 import pygame as pg
 
-from One3D import Producer, Camera, Scene3D, create_cube, BLACK, Vector3, OBJECT_FLAG_MAP, Object3d
+from One3D import Producer, Camera, Scene3D, create_cube, BLACK, Vector3, OBJECT_FLAG_MAP, Object3d, create_normal, \
+    convert_faces_to_lines
+from face import Face
 from face_mesh import get_face_points, get_frame, init_cam, get_face
-from face_mesh_connections import FACEMESH_TESSELATION
+from face_mesh_connections import FACEMESH_TESSELATION, FACEMESH_SURFACES
 from face_position import get_base_point, face2angle
 from main import draw_face
 
@@ -15,14 +17,25 @@ screen = pg.display.set_mode((780, 420))
 pi2 = pi / 2
 
 
-def draw_face3d(camera, face):
+def vec(point):
+    return pg.Vector3(point.x, point.y, point.z)
+
+
+def draw_face3d(scene3d: Scene3D, face: Face):
     if not face.all_points:
         return
     cof = 30
-    points = [((p.x-0.5)*-cof, (p.y-0.5)*-cof, (p.z-0.5)*cof) for p in face.all_points]
+    points = [((p.x - 0.5) * -cof, (p.y - 0.5) * -cof, (p.z - 0.5) * cof) for p in face.all_points]
     # print(points)
-    face3d = Object3d(None, (0, 0, 0), points, FACEMESH_TESSELATION)
-    face3d.show(camera, None)
+    normals = [create_normal(vec(face.all_points[p1]), vec(face.all_points[p2]), vec(face.all_points[p3]))*100
+               for p1, p2, p3 in FACEMESH_SURFACES]
+    # v1 = pg.Vector3(1, 0, 0)
+    normals = [v if v.z < 0 else -v for v in normals]
+    edges = convert_faces_to_lines(FACEMESH_SURFACES)
+
+    face3d = Object3d(None, (0, 0, 0), points, edges, FACEMESH_SURFACES, normals=normals)
+    scene3d.static = [face3d]
+    # face3d.show(camera, None)
 
 
 def main():
@@ -30,7 +43,7 @@ def main():
     running = True
     obj = create_cube(None, (0, -5, 0), 13)
     scene3d = Scene3D()
-    # scene3d.add_static(obj)
+    scene3d.add_static(obj)
     camera3d = Camera(scene3d, scene3d, screen, (0, 0, -50), (0, 0, 0), background=(10, 10, 10))
     producer = Producer()
     producer.add_camera(camera3d)
@@ -47,16 +60,16 @@ def main():
             # print(x_angle, -(x_angle - pi / 2))
 
         obj.set_rotation(Vector3(((x_angle - pi2), -(y_angle - pi2), 0)))
+        draw_face3d(scene3d, face)
         producer.show()
-        draw_face3d(camera3d, face)
         # draw_face(screen, face)
 
-        p = Vector2(300, 500)
-        v = p + pg.math.Vector2(0, 100).rotate_rad(x_angle - pi2)
-        pg.draw.line(screen, "green", p, v)
-        p = Vector2(800, 500)
-        v = p + pg.math.Vector2(0, 100).rotate_rad(y_angle - pi2)
-        pg.draw.line(screen, "green", p, v)
+        # p = Vector2(300, 500)
+        # v = p + pg.math.Vector2(0, 100).rotate_rad(x_angle - pi2)
+        # pg.draw.line(screen, "green", p, v)
+        # p = Vector2(800, 500)
+        # v = p + pg.math.Vector2(0, 100).rotate_rad(y_angle - pi2)
+        # pg.draw.line(screen, "green", p, v)
 
         pg.display.flip()
 

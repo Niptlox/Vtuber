@@ -8,7 +8,7 @@ def face2angle(all_points, base_point, in_degrees=True):
     vec = (Vector3(all_points[0].x, all_points[0].y, all_points[0].z) - base_point).normalize()
     horizontal_angle = arccos(vec.y)
     vertical_angle = arccos(vec.x)
-    print(horizontal_angle * 180 / pi, vec)
+    # print(horizontal_angle * 180 / pi, vec)
     if in_degrees:
         return horizontal_angle * 180 / pi, vertical_angle * 180 / pi
 

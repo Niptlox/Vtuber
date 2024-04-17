@@ -21,7 +21,7 @@ SPLINE_COF = 10
 if SHUFFLE:
     face_mesh.shuffle_contours()
 
-cam = face_mesh.init_cam()
+cam = face_mesh.init_cam(1)
 cam_size = face_mesh.get_cam_size(cam)
 H = 1000
 SIZE = cam_size[0] * H / cam_size[1], H

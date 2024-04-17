@@ -4,8 +4,11 @@ from typing import NamedTuple, List
 
 import cv2
 import mediapipe as mp
+
+from face import TILT_LEFT, TILT_RIGHT, NO_TILT, FaceState, Face
 from face_mesh_connections import NUM_TOP, NUM_BOTTOM, NUM_RIGHT_EYE_TOP, NUM_RIGHT_EYE_BOTTOM, NUM_LEFT_EYE_BOTTOM, \
     NUM_LEFT_EYE_TOP, NUP_LIP_BOTTOM_TOP, NUP_LIP_TOP_BOTTOM
+from face_position import face2angle, get_base_point
 
 ABRAKADABRA = False
 
@@ -29,31 +32,10 @@ face_mesh = mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1,
 _img = cv2.imread("img.jpg")
 DEBUG_CAM_IS_IMG = False
 
-NO_TILT = 0
-TILT_LEFT = 1
-TILT_RIGHT = 2
-
-
-class FaceState(NamedTuple):
-    left_eye_closed: bool
-    right_eye_closed: bool
-    left_eye_cof: float
-    right_eye_cof: float
-    eyes_closed: bool
-    mouth_closed: bool
-    tilt: int
-
-
-class Face(NamedTuple):
-    all_points: List
-    contours: List
-    state: FaceState
-
 
 def get_face_points(image) -> list:
-    height, width, _ = image.shape
-    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    result = face_mesh.process(rgb_image)
+    # height, width, _ = image.shape
+    result = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     if result.multi_face_landmarks:
         points = result.multi_face_landmarks[0].landmark
         return list(points)
@@ -169,7 +151,7 @@ def get_face(vid, auto_hide_iris=True) -> Face:
                 points[470].y = max(points[NUM_RIGHT_EYE_TOP].y, points[470].y)
                 points[472].y = min(points[NUM_RIGHT_EYE_BOTTOM].y, points[472].y)
         contours = points2counters(points)
-    face = Face(contours=contours, all_points=points, state=state)
+    face = Face(contours=contours, all_points=points, state=state, image=frame)
     # print(state)
     return face
 
@@ -225,15 +207,15 @@ def draw_points_face(vid):
 
 
 if __name__ == '__main__':
-    DEBUG_CAM_IS_IMG = True
-    TYP = 1
+    DEBUG_CAM_IS_IMG = 0
+    TYP = 2
     t = time.time()
+    cam = init_cam(0)
     if TYP == 0:
-        cam = init_cam()
         while 1:
             _, img = cam.read()
             res = get_face_mesh_from_cam(cam)
-            # draw_contours(img, res)
+            draw_contours(img, res)
             s = time.time() - t
             print(s, 1 / s)
             t = time.time()
@@ -241,23 +223,26 @@ if __name__ == '__main__':
                 break
         cv2.destroyAllWindows()
     elif TYP == 1:
-        cam = init_cam()
         while 1:
             draw_points_face(cam)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         cv2.destroyAllWindows()
     elif TYP == 2:
-        cam = init_cam()
+
         mp_drawing = mp.solutions.drawing_utils
+        base_point = get_base_point(get_face_points(get_frame(cam)))
         while 1:
             frame = get_frame(cam)
-            all_points = get_face_points(frame)
-            if all_points:
+            res = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            # all_points = get_face_points(frame)
+            if res.multi_face_landmarks:
+                mfl0 = res.multi_face_landmarks[0]
                 mp_drawing.draw_landmarks(
                     image=frame,
-                    landmark_list=[all_points],
+                    landmark_list=mfl0,
                     connections=mp_face_mesh.FACEMESH_TESSELATION, )
+                print(face2angle(mfl0.landmark, base_point))
             cv2.imshow("Frame", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):

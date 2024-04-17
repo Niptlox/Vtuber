@@ -21,7 +21,7 @@ SPLINE_COF = 10
 if SHUFFLE:
     face_mesh.shuffle_contours()
 
-cam = face_mesh.init_cam(1)
+cam = face_mesh.init_cam(0)
 cam_size = face_mesh.get_cam_size(cam)
 H = 1000
 SIZE = cam_size[0] * H / cam_size[1], H
@@ -85,10 +85,11 @@ def smooth_line(points):
     return [(r[i - 1], r[i]) for i in range(1, len(r))]
 
 
-def draw_face(surface):
+def draw_face(surface, face=None):
     # surface.fill(colorkey)  # Transparent background
     width, height = SIZE
-    face = face_mesh.get_face(cam)
+    if face is None:
+        face = face_mesh.get_face(cam)
 
     gray = (230, 240, 240)
     colors = "blue", gray, gray, "red", "red", "green", "yellow", "purple", "lightblue", "lightblue"
@@ -122,39 +123,40 @@ def draw_face(surface):
             # time.sleep(0.01)
         i += 1
 
+if __name__ == '__main__':
 
-screen.set_colorkey(colorkey)
-done = False
-last_surface = pygame.Surface(SIZE)
-last_surface.set_colorkey(colorkey)
-history_len = 1
-history_screen = [None] * history_len
-while not done:
-    screen.fill(colorkey)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_h:
-                wx, wy = window.position
-                set_flag(pygame.NOFRAME)
-                win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*colorkey), 0, win32con.LWA_COLORKEY)
-                win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, wx, wy, 0, 0, win32con.SWP_NOSIZE)
-            if event.key == pygame.K_s:
-                set_flag(0)
-    # last_surface.set_alpha(50)
-    # screen.blit(last_surface, (0, 0))
-    surface = pygame.Surface(SIZE)
-    surface.fill(colorkey)
-    surface.set_colorkey(colorkey)
+    screen.set_colorkey(colorkey)
+    done = False
+    last_surface = pygame.Surface(SIZE)
+    last_surface.set_colorkey(colorkey)
+    history_len = 1
+    history_screen = [None] * history_len
+    while not done:
+        screen.fill(colorkey)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_h:
+                    wx, wy = window.position
+                    set_flag(pygame.NOFRAME)
+                    win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*colorkey), 0, win32con.LWA_COLORKEY)
+                    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, wx, wy, 0, 0, win32con.SWP_NOSIZE)
+                if event.key == pygame.K_s:
+                    set_flag(0)
+        # last_surface.set_alpha(50)
+        # screen.blit(last_surface, (0, 0))
+        surface = pygame.Surface(SIZE)
+        surface.fill(colorkey)
+        surface.set_colorkey(colorkey)
 
-    draw_face(screen)
+        draw_face(screen)
 
-    history_screen.pop(0)
-    history_screen.append(surface)
-    for shot in history_screen:
-        if shot:
-            screen.blit(shot, (0, 0))
+        history_screen.pop(0)
+        history_screen.append(surface)
+        for shot in history_screen:
+            if shot:
+                screen.blit(shot, (0, 0))
 
-    pygame.display.update()
-    # time.sleep(0.01)
+        pygame.display.update()
+        # time.sleep(0.01)

@@ -8,10 +8,13 @@ delta_rotation = math.pi / 18
 
 NUMPY_POINT = False
 
+SHOW_EDGES = True
 SHOW_POINTS = False
-SHOW_EDGES = False
+SHOW_POINTS |= SHOW_EDGES
 SHOW_POLYGONS = True
 SHOW_NORMALS = False
+
+MIN_LIGHT = 35
 
 ## изменяется при переходе к следующему состоянию сцены
 ## равен сумме
@@ -621,7 +624,8 @@ class MatrixRotation3:
 
 
 def get_color_of_light(color, light):
-    return max(0, min(255, color[0] * light)), max(0, min(255, color[1] * light)), max(0, min(255, color[2] * light))
+    return max(MIN_LIGHT, min(255, color[0] * light)), max(MIN_LIGHT, min(255, color[1] * light)), \
+        max(MIN_LIGHT, min(255, color[2] * light))
 
 
 DEF_LAMPS = [Vector3(-0.5, -1, 0.75).normalize()]
@@ -1222,7 +1226,7 @@ def main():
     while running:
         [exit() for event in pg.event.get(pg.QUIT)]
         screen.fill(BLACK)
-        obj.set_rotation(obj.rotation + Vector3(0.1, 0.1, 0))
+        obj.set_rotation(obj.rotation + Vector3(0, 0.1, 0))
         producer.show()
         pg.display.flip()
         sleep(0.1)

@@ -1,17 +1,19 @@
 from time import sleep
-from typing import List
+from typing import List, Tuple
 import math
 import pygame as pg
 from math import cos, sin
+
+import pygame.display
 
 delta_rotation = math.pi / 18
 
 NUMPY_POINT = False
 
-SHOW_EDGES = False
+SHOW_EDGES = True
 SHOW_POINTS = False
 SHOW_POINTS |= SHOW_EDGES
-SHOW_POLYGONS = True
+SHOW_POLYGONS = False
 SHOW_NORMALS = False
 IGNOR_NORMAL = False
 
@@ -626,7 +628,7 @@ class MatrixRotation3:
 
 def create_normal(p0: Vector3, p1, p2):
     # print(p0, p1, p2, "====", (p1 - p0).cross(p2-p0))
-    return (p1 - p0).cross(p2-p0)
+    return (p1 - p0).cross(p2 - p0)
 
 
 def get_color_of_light(color, light):
@@ -662,6 +664,8 @@ iiiii = 0
 
 
 class None3D:
+    """Nononononon """
+
     def __init__(self, owner, position, flag=0):
         self._owner = None
         self.set_owner(owner)
@@ -766,28 +770,17 @@ class VertexPoint(None3D):
             return
         if self.flag & OBJECT_FLAG_VISIBLE:
             self.flag ^= OBJECT_FLAG_VISIBLE
-        position_from_camera = self.global_position - camera.global_position
-
-        # vec_to = position_from_camera
-        # vec_to.rotate_y_rad_ip(camera.rotation.y)
-        # vec_to.rotate_x_rad_ip(camera.rotation.x)
-        # vec_at_camera = vec_to
-
-        vec_at_camera = camera.get_matrix_rotation() * position_from_camera
-        self.dist_to_camera = dist = vec_at_camera[2]
-        if dist == 0:
-            dist = 1e-9
-        x = camera.focus * vec_at_camera[0] / dist + camera.half_w
-        y = camera.half_h - camera.focus * vec_at_camera[1] / dist
-        self.position2d_on_camera = x, y
+        self.position2d_on_camera, self.dist_to_camera, is_visible = camera.calc_point(self.global_position)
         # draw_point(camera, "green", self.position2d_on_camera)
         # self.tact_3d = self._owner.calc_point(camera, self)
         self.tact_3d = target_tact_3d
-        if camera.surface_rect.collidepoint(self.position2d_on_camera) and dist > 0:
+        if is_visible:
             self.flag |= OBJECT_FLAG_VISIBLE
 
     def show(self, camera, lamps, color="white"):
+        self.calc(camera, _tact_3d + PHASE_SCREEN)
         draw_point(camera, color, self.position2d_on_camera)
+        # print(self.position2d_on_camera)
         return self.position2d_on_camera
 
 
@@ -796,8 +789,9 @@ def init_points_from_lst(owner, points_lst, flag):
 
 
 class Object3d(None3D):
-    def __init__(self, owner, position, points_lst, edges, faces=[], normals=[], rotation=(0, 0, 0), flag=0):
+    def __init__(self, owner, position, points_lst, edges, faces=[], normals=[], rotation=(0, 0, 0), flag=0, colors=[]):
         super().__init__(owner, Vector3(position), flag)
+        self.color = WHITE
         self._global_position = Vector3(position)
         self.matrix_rotation = MatrixRotation3(Vector3(rotation))
         self.flag |= OBJECT_FLAG_NOT_CALC_GLOBAL + OBJECT_FLAG_MOVING
@@ -808,16 +802,22 @@ class Object3d(None3D):
         self.edges = edges
         self.faces = list(faces)
         self.normals = list(normals)
+
         if not faces:
             self.polygons = []
         elif isinstance(faces[0][0], int):
             # elif self.normals:
-            self.polygons = [Polygon(self, [self.points[i] for i in face], normal=normal, flag=POLYGON_FLAG_HAVE_NORMAL)
+            self.polygons = [Polygon(self, [self.points[i] for i in face], normal=normal,
+                                     flag=POLYGON_FLAG_HAVE_NORMAL, color=self.color)
                              for face, normal in zip(self.faces, self.normals)]
             # print(self.faces, self.normals)
         elif len(faces[0][0]) == 3:
             self.polygons = [Polygon(self, [self.points[p[0]] for p in face], normal=self.normals[face[0][2]],
-                                     flag=POLYGON_FLAG_HAVE_NORMAL) for face in self.faces]
+                                     flag=POLYGON_FLAG_HAVE_NORMAL, color=self.color) for face in self.faces]
+        if colors:
+            for _color, poly in zip(colors, self.polygons):
+                if _color:
+                    poly.color = _color
         self.tact_3d = TACT_RESTART
         # : разобрать точки на внешние и внутрение
 
@@ -867,10 +867,6 @@ class Object3d(None3D):
         if self.flag & OBJECT_FLAG_MOVING:
             self.flag -= OBJECT_FLAG_MOVING
 
-    SHOW_POINTS = False
-    SHOW_EDGES = False
-    SHOW_POLYGONS = True
-
     def show(self, camera, lamps):
         color = pg.color.Color(WHITE)
         self.calc(camera, _tact_3d + PHASE_SCREEN)
@@ -907,8 +903,9 @@ class Surface3dMonocolor(Surface3d):
 
 
 class Polygon:
-    def __init__(self, owner, points: List[VertexPoint], flag=0, normal=(0, 0, 0)):
+    def __init__(self, owner, points: List[VertexPoint], flag=0, normal=(0, 0, 0), color=WHITE):
         self.owner = owner
+        self.color = WHITE
         self.points = points
         self.flag = int(flag)
         self._init_normal = Vector3(normal)
@@ -946,10 +943,9 @@ class Polygon:
 
     def show(self, camera, lamps):
         if self.flag & OBJECT_FLAG_VISIBLE:
-            color = WHITE
             light = get_light_of_lamps(self.normal, lamps)
             points2d = [pnt.position2d_on_camera for pnt in self.points]
-            draw_polygon(camera, get_color_of_light(color, light), points2d)
+            draw_polygon(camera, get_color_of_light(self.color, light), points2d)
             if SHOW_NORMALS:
                 self._init_normal_point.calc(camera, _tact_3d + PHASE_SCREEN)
                 # self._init_normal_point.show(camera, lamps, color="green")
@@ -1112,7 +1108,7 @@ class CameraPolygons:
     def __init__(self, camera, scene):
         self.camera = camera
         self.scene = scene
-        self.polygons = []
+        self.polygons: List[Tuple[Polygon, int]] = []
 
     def add(self, polygon: Polygon):
         max_dist = max([pnt.dist_to_camera for pnt in polygon.points + []])
@@ -1129,7 +1125,7 @@ class CameraPolygons:
 
 class Camera(None3D):
     def __init__(self, owner, scene: Scene3D, surface: pg.Surface, position: Vector3, rotation: Vector3,
-                 fov: float = 3.14159 / 3, background=BLACK):
+                 fov: float = math.pi / 3, background=BLACK):
         super().__init__(owner, Vector3(position), flag=0)
         self.surface = surface
         self.scene = scene
@@ -1138,10 +1134,11 @@ class Camera(None3D):
         self.surface_rect = pg.Rect(0, 0, self.width, self.height)
         self.half_w, self.half_h = self.width // 2, self.height // 2
         self.fov = fov
-        self.focus = self.half_w / math.tan(self.fov / 2)
+        self.focus = math.atan(self.fov / 2) * self.half_w
+        print(self.focus)
         # init property enable
         self._active = True
-        self._visible_distance = 500
+        self._visible_distance = 15000
         self._visible_distance2 = self._visible_distance ** 2
         self.matrix_rotation = MatrixRotation3(rotation)
         self.polygons = CameraPolygons(self, self.scene)
@@ -1155,6 +1152,17 @@ class Camera(None3D):
 
     def get_matrix_rotation(self):
         return self.matrix_rotation
+
+    def calc_point(self, global_position) -> Tuple[Tuple[float, float], float, bool]:
+        position_from_camera = global_position - self.global_position
+        vec_at_camera = self.get_matrix_rotation() * position_from_camera
+        dist = vec_at_camera[2]
+        if dist == 0:
+            dist = 1e-9
+        x = self.focus * vec_at_camera[0] / dist + self.half_w
+        y = self.half_h - self.focus * vec_at_camera[1] / dist
+        is_visible = self.surface_rect.collidepoint((x, y))
+        return (x, y), dist, is_visible
 
     def object_is_visible(self, object3d: None3D):
         # TODO: Простая проверка виден ли объект на камере
@@ -1177,7 +1185,8 @@ class Camera(None3D):
         # end active
 
     def show(self):
-        self.surface.fill(self.background)
+        if self.background:
+            self.surface.fill(self.background)
         self.polygons.clear()
         self.scene.show(self)
         self.polygons.show()
@@ -1213,7 +1222,7 @@ class Producer(object):
         for cam in self.cameras:
             if cam.active:
                 cam.show()
-        self.new_tact()
+            self.new_tact()  # todo: СДЕЛАТЬ ОТДЕЛЬНЫЙ ТАКТ ДЛЯ КАЖДОЙ КАМЕРЫ
 
 
 def clear_screen(screen):
@@ -1221,22 +1230,28 @@ def clear_screen(screen):
 
 
 def main():
-    screen = pg.display.set_mode((720, 480), flags=pg.RESIZABLE)
+    pygame.init()
+    w, h = pygame.display.Info().current_w, pygame.display.Info().current_h
+    screen = pg.display.set_mode((w, h), flags=pg.RESIZABLE)
     running = True
-    obj = create_cube(None, (0, 1, 0), 10)
-
+    obj = create_cube(None, (0, 0, 0), 300)
+    obj = load_object_from_fileobj(None, (0, -118, 15), "bedroom1.obj", scale=1)
     scene3d = Scene3D()
     scene3d.add_static(obj)
-    camera = Camera(scene3d, scene3d, screen, (0, 0, -50), (0, 0, 0), background=(10, 10, 10))
+    camera = Camera(scene3d, scene3d, screen, (0, 0, 0), (0, 0, 0), background=(10, 10, 10))
     producer = Producer()
     producer.add_camera(camera)
     while running:
         [exit() for event in pg.event.get(pg.QUIT)]
+        [camera.position.__add__(Vector3(0, 0, -1)) for event in pg.event.get(pg.KEYDOWN)]
         screen.fill(BLACK)
-        obj.set_rotation(obj.rotation + Vector3(0, 0.1, 0))
+        # obj.set_rotation(obj.rotation + Vector3(0, 0.01, 0))
         producer.show()
         pg.display.flip()
         sleep(0.1)
+
+        # camera.focus -= 1
+        print(camera.position)
 
 
 if __name__ == '__main__':

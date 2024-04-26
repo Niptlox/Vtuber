@@ -7,8 +7,8 @@ import mediapipe as mp
 
 from face import TILT_LEFT, TILT_RIGHT, NO_TILT, FaceState, Face
 from face_mesh_connections import NUM_TOP, NUM_BOTTOM, NUM_RIGHT_EYE_TOP, NUM_RIGHT_EYE_BOTTOM, NUM_LEFT_EYE_BOTTOM, \
-    NUM_LEFT_EYE_TOP, NUP_LIP_BOTTOM_TOP, NUP_LIP_TOP_BOTTOM
-from face_position import face2angle, get_base_point
+    NUM_LEFT_EYE_TOP, NUP_LIP_BOTTOM_TOP, NUP_LIP_TOP_BOTTOM, FACEMESH_TESSELATION
+from face_position import face2pos, get_base_point
 
 ABRAKADABRA = False
 
@@ -189,7 +189,8 @@ def draw_points_face(vid):
     all_points = get_face_points(frame)
     # mp_drawing = mp.solutions.drawing_utils
     # mp_drawing_styles = mp.solutions.drawing_styles
-    arrrrr = {i for p in FACEMESH_RIGHT_IRIS for i in p}
+    arrrrr = {i for p in FACEMESH_TESSELATION for i in p}
+
     if all_points:
         for i, p in enumerate(all_points):
             if i in arrrrr:
@@ -242,7 +243,7 @@ if __name__ == '__main__':
                     image=frame,
                     landmark_list=mfl0,
                     connections=mp_face_mesh.FACEMESH_TESSELATION, )
-                print(face2angle(mfl0.landmark, base_point))
+                print(face2pos(mfl0.landmark, base_point))
             cv2.imshow("Frame", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):

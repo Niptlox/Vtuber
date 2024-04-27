@@ -8,7 +8,7 @@ import mediapipe as mp
 from face import TILT_LEFT, TILT_RIGHT, NO_TILT, FaceState, Face
 from face_mesh_connections import NUM_TOP, NUM_BOTTOM, NUM_RIGHT_EYE_TOP, NUM_RIGHT_EYE_BOTTOM, NUM_LEFT_EYE_BOTTOM, \
     NUM_LEFT_EYE_TOP, NUP_LIP_BOTTOM_TOP, NUP_LIP_TOP_BOTTOM, FACEMESH_TESSELATION
-from face_position import face2pos, get_base_point
+from face_position import face2pos, get_base
 
 ABRAKADABRA = False
 
@@ -189,7 +189,7 @@ def draw_points_face(vid):
     all_points = get_face_points(frame)
     # mp_drawing = mp.solutions.drawing_utils
     # mp_drawing_styles = mp.solutions.drawing_styles
-    arrrrr = {i for p in FACEMESH_TESSELATION for i in p}
+    arrrrr = {i for p in [[33]] for i in p}
 
     if all_points:
         for i, p in enumerate(all_points):
@@ -208,8 +208,8 @@ def draw_points_face(vid):
 
 
 if __name__ == '__main__':
-    DEBUG_CAM_IS_IMG = 0
-    TYP = 2
+    DEBUG_CAM_IS_IMG = 1
+    TYP = 1
     t = time.time()
     cam = init_cam(0)
     if TYP == 0:
@@ -224,15 +224,17 @@ if __name__ == '__main__':
                 break
         cv2.destroyAllWindows()
     elif TYP == 1:
+        draw_points_face(cam)
         while 1:
-            draw_points_face(cam)
+            if cv2.waitKey(1) & 0xFF == ord('s'):
+                draw_points_face(cam)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         cv2.destroyAllWindows()
     elif TYP == 2:
 
         mp_drawing = mp.solutions.drawing_utils
-        base_point = get_base_point(get_face_points(get_frame(cam)))
+        base_point, _ = get_base(get_face_points(get_frame(cam)))
         while 1:
             frame = get_frame(cam)
             res = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))

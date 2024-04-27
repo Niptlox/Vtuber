@@ -11,12 +11,13 @@ delta_rotation = math.pi / 18
 NUMPY_POINT = False
 
 SHOW_EDGES = True
-SHOW_POINTS = False
+SHOW_POINTS = True
 SHOW_POINTS |= SHOW_EDGES
-SHOW_POLYGONS = False
-SHOW_NORMALS = False
+SHOW_POLYGONS = True
+SHOW_NORMALS = True
 IGNOR_NORMAL = False
 
+NORMAL_COF = 15
 MIN_LIGHT = 35
 
 ## изменяется при переходе к следующему состоянию сцены
@@ -101,7 +102,7 @@ Rotation_X = 1
 Rotation_Y = 2
 Rotation_Z = 3
 
-MATRIX_CALC_MODE = 1
+MATRIX_CALC_MODE = 2
 
 
 def vector_mod(vector, value):
@@ -142,18 +143,18 @@ def crt_rotation_matrix_pre(cos_a, sin_a, rot_axis, c=None):
     # sin_a = math.sin(angle)
     if rot_axis == Rotation_X:
         c[1][1] = cos_a
-        c[1][2] = sin_a
-        c[2][1] = -sin_a
+        c[1][2] = -sin_a
+        c[2][1] = sin_a
         c[2][2] = cos_a
     elif rot_axis == Rotation_Y:
         c[0][0] = cos_a
-        c[0][2] = sin_a
-        c[2][0] = -sin_a
+        c[0][2] = -sin_a
+        c[2][0] = sin_a
         c[2][2] = cos_a
     elif rot_axis == Rotation_Z:
         c[0][0] = cos_a
-        c[0][1] = sin_a
-        c[1][0] = -sin_a
+        c[0][1] = -sin_a
+        c[1][0] = sin_a
         c[1][1] = cos_a
     return c
 
@@ -565,10 +566,13 @@ class MatrixRotation3:
 
         self._sinx, self._siny, self._sinz = 0, 0, 0
         self._cosx, self._cosy, self._cosz = 0, 0, 0
-        self._matrix = None
+        self._matrix = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
         self._matrixes = [None, None, None]
+        self._mul1_0 = None
 
     def get_matrix(self):
+        if MATRIX_CALC_MODE == 3:
+            return self._matrix
         if not all(self.calc_flag):
             x, y, z = self._rotation.xyz
             if MATRIX_CALC_MODE == 1:
@@ -596,7 +600,11 @@ class MatrixRotation3:
                     self._matrixes[1] = crt_rotation_matrix(y, Rotation_Y)
                 if not self.calc_flag[2]:
                     self._matrixes[2] = crt_rotation_matrix(z, Rotation_Z)
-                self._matrix = mul_matrix(self._matrixes[2], mul_matrix(self._matrixes[1], self._matrixes[0]))
+                if not self.calc_flag[0] or not self.calc_flag[1]:
+                    self._mul1_0 = mul_matrix(self._matrixes[1], self._matrixes[0])
+                if not all(self.calc_flag):
+                    self._matrix = mul_matrix(self._matrixes[2], self._mul1_0)
+        self.calc_flag = [True] * 3
         return self._matrix
 
     def set_rotation(self, rotation):
@@ -606,6 +614,17 @@ class MatrixRotation3:
             self.calc_flag[1] = False
         if rotation.z != self._rotation.z:
             self.calc_flag[2] = False
+        if MATRIX_CALC_MODE == 3:
+            offset = Vector3(vector_mod(rotation, PI2)) - self._rotation
+            if offset.x:
+                m = crt_rotation_matrix(offset.x, Rotation_X)
+                self._matrix = mul_matrix(self._matrix, m)
+            if offset.y:
+                m = crt_rotation_matrix(offset.y, Rotation_Y)
+                self._matrix = mul_matrix(self._matrix, m)
+            if offset.z:
+                m = crt_rotation_matrix(offset.z, Rotation_Z)
+                self._matrix = mul_matrix(self._matrix, m)
         self._rotation = vector_mod(rotation, PI2)
 
     @property
@@ -618,7 +637,7 @@ class MatrixRotation3:
     def __mul__(self, other):
         if isinstance(other, Vector3) or (isinstance(other, list) and len(other) == 3):
             # _ =
-            if MATRIX_CALC_MODE in (1, 2):
+            if MATRIX_CALC_MODE in (1, 2, 3):
                 return mul_vector_matrix(other, self.get_matrix())
             elif MATRIX_CALC_MODE == 0:
                 return (other).rotate_z_rad(self._rotation.z).rotate_y_rad(self._rotation.y).rotate_x_rad(
@@ -657,7 +676,10 @@ def draw_line(camera, color, position_1, position_2):
 
 
 def draw_polygon(camera, color, positions):
-    pg.draw.polygon(camera.surface, color, positions)
+    if SHOW_POLYGONS:
+        pg.draw.polygon(camera.surface, color, positions)
+    if SHOW_EDGES:
+        pg.draw.lines(camera.surface, color, True, positions)
 
 
 iiiii = 0
@@ -879,7 +901,7 @@ class Object3d(None3D):
                         point.flag ^= OBJECT_FLAG_VISIBLE
                     else:
                         points2d.append(None)
-                if SHOW_EDGES:
+                if SHOW_EDGES and not self.faces:
                     for pos_i1, pos_i2 in self.edges:
                         if points2d[pos_i1] and points2d[pos_i2]:
                             draw_line(camera, color, points2d[pos_i1], points2d[pos_i2])
@@ -908,11 +930,14 @@ class Polygon:
         self.color = WHITE
         self.points = points
         self.flag = int(flag)
+
         self._init_normal = Vector3(normal)
+        if self._init_normal.length() > 0:
+            self._init_normal.normalize_ip()
 
         self._center_point = VertexPoint(owner, self.get_center_position(), flag=OBJECT_FLAG_NOT_CALC_GLOBAL)
 
-        self._init_normal_point = VertexPoint(owner, self._center_point.local_position + Vector3(normal) * 5,
+        self._init_normal_point = VertexPoint(owner, self._center_point.local_position + Vector3(normal) * NORMAL_COF,
                                               flag=OBJECT_FLAG_NOT_CALC_GLOBAL + POINT_FLAG_NORMAL)
         if flag & POLYGON_FLAG_HAVE_NORMAL:
             self.normal: Vector3 = self.update_normal()
@@ -994,11 +1019,11 @@ def convert_faces_to_lines(faces):
     return lines
 
 
-def create_cube(owner, position, size, flag=0):
-    return create_box(owner, position, (size, size, size), flag)
+def create_cube(owner, position, size, flag=0, color=WHITE):
+    return create_box(owner, position, (size, size, size), flag, color=color)
 
 
-def create_box(owner, position, size3, flag=0):
+def create_box(owner, position, size3, flag=0, color=WHITE):
     hx, hy, hz = (Vector3(size3) / 2).xyz
     if flag & OBJECT_FLAG_MAP:
         x, y, z = Vector3(position).xyz
@@ -1014,14 +1039,21 @@ def create_box(owner, position, size3, flag=0):
         (x + hx, y - hy, z - hz),
         (x + hx, y - hy, z + hz),
         (x, y, z), ]
-    edges = [(0, 1), (1, 2), (2, 3), (3, 0),
-             (7, 6), (6, 5), (5, 4), (4, 7), ]
-    faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 2, 6, 5), (3, 2, 6, 7), (0, 3, 7, 4)]
+
+    if color is None:
+        faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 2, 6, 5), (3, 2, 6, 7), (0, 3, 7, 4)]
+        colors = [color] * len(faces)
+        edges = convert_faces_to_lines(faces)
+    else:
+        faces = []
+        colors = []
+        edges = [(0, 1), (1, 2), (2, 3), (3, 0),
+                 (7, 6), (6, 5), (5, 4), (4, 7), ]
     normals = [(0, 1, 0), (0, -1, 0), (-1, 0, 0), (0, 0, -1), (1, 0, 0), (0, 0, 1)]
     # faces = [(1, 2, 6, 5)]
     # normals = [(0, 0, -1)]
-    edges = convert_faces_to_lines(faces)
-    return Object3d(owner, position, points3, edges, faces, normals, flag=flag)
+
+    return Object3d(owner, position, points3, edges, faces, normals, flag=flag, colors=colors)
 
 
 def open_file_obj(path, scale=1, _convert_faces_to_lines=False, ):
@@ -1087,7 +1119,8 @@ def convert_faces_to_lines(faces):
 def load_object_from_fileobj(owner, position, path, scale=1, flag=0):
     vertexes, faces, normals = open_file_obj(path, scale, _convert_faces_to_lines=False)
     print(f"Load model: {path}, vertexes: {len(vertexes)}, faces: {len(faces)}, normals: {len(normals)}")
-    obj = Object3d(owner, position, vertexes, [], faces, normals, flag=flag)
+    edges = []
+    obj = Object3d(owner, position, vertexes, edges, faces, normals, flag=flag)
     return obj
 
 
@@ -1096,8 +1129,12 @@ class Scene3D(object):
         self.static: List[Object3d] = []
         self.lamps = []
 
-    def add_static(self, obj: Object3d):
-        self.static.append(obj)
+    def add_static(self, obj: Object3d|List[Object3d]):
+        if isinstance(obj, (list, tuple)):
+            for obj_ in obj:
+                self.static.append(obj_)
+        else:
+            self.static.append(obj)
 
     def show(self, camera):
         for obj in self.static:
@@ -1161,7 +1198,7 @@ class Camera(None3D):
             dist = 1e-9
         x = self.focus * vec_at_camera[0] / dist + self.half_w
         y = self.half_h - self.focus * vec_at_camera[1] / dist
-        is_visible = self.surface_rect.collidepoint((x, y))
+        is_visible = self.surface_rect.collidepoint((x, y)) and dist > 0
         return (x, y), dist, is_visible
 
     def object_is_visible(self, object3d: None3D):
@@ -1189,6 +1226,7 @@ class Camera(None3D):
             self.surface.fill(self.background)
         self.polygons.clear()
         self.scene.show(self)
+        # if SHOW_POLYGONS:
         self.polygons.show()
 
 

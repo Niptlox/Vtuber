@@ -21,24 +21,6 @@ SPLINE_COF = 10
 if SHUFFLE:
     face_mesh.shuffle_contours()
 
-cam = face_mesh.init_cam(0)
-cam_size = face_mesh.get_cam_size(cam)
-H = 1000
-SIZE = cam_size[0] * H / cam_size[1], H
-
-pygame.init()
-pygame.font.init()
-font = pygame.font.SysFont("", 9)
-screen = pygame.display.set_mode(SIZE)  # For borderless, use pygame.NOFRAME
-window = Window.from_display_module()
-
-# -------
-hwnd = pygame.display.get_wm_info()["window"]
-win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
-                       win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
-
-
-# --------
 
 def set_flag(flag):
     global screen
@@ -123,7 +105,25 @@ def draw_face(surface, face=None):
             # time.sleep(0.01)
         i += 1
 
+
 if __name__ == '__main__':
+    cam = face_mesh.init_cam(0)
+    cam_size = face_mesh.get_cam_size(cam)
+    H = 1000
+    SIZE = cam_size[0] * H / cam_size[1], H
+
+    pygame.init()
+    pygame.font.init()
+    font = pygame.font.SysFont("", 9)
+    screen = pygame.display.set_mode(SIZE)  # For borderless, use pygame.NOFRAME
+    window = Window.from_display_module()
+
+    # -------
+    hwnd = pygame.display.get_wm_info()["window"]
+    win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
+                           win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
+
+    # --------
 
     screen.set_colorkey(colorkey)
     done = False

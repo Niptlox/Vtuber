@@ -208,8 +208,8 @@ def draw_points_face(vid):
 
 
 if __name__ == '__main__':
-    DEBUG_CAM_IS_IMG = 1
-    TYP = 1
+    DEBUG_CAM_IS_IMG = 0
+    TYP = 0
     t = time.time()
     cam = init_cam(0)
     if TYP == 0:

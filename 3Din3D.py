@@ -47,23 +47,24 @@ def vec(point):
     return pg.Vector3(point.x, point.y, point.z)
 
 
-def convert_points(points, base_point):
-    cof = 30
+def convert_points(points, point0, cof=30):
     p0x, p0y, p0z = points[0].x, points[0].y, points[0].z
-    return [Vector3((p.x-p0x - 0.5) * -cof, (p.y-p0y - 0.5) * -cof, (p.z-p0z - 0.5) * -cof) for p in points]
+    return [(point0+(p.x-p0x, p.y-p0y, p.z-p0z))*-cof for p in points]
 
 
 colors = [BLUE] * len(FACEMESH_SURFACES) + [RED] * (len(LEFT_IRIS_SURFACES) * 2)
 
 
-def draw_face3d(scene3d: Scene3D, position, face: Face, face_cof, objects):
+def draw_face3d(scene3d: Scene3D, position, face: Face, point0, face_cof, objects):
     if not face.all_points:
         return
     surfaces = FACEMESH_SURFACES + RIGHT_IRIS_SURFACES + LEFT_IRIS_SURFACES
-    points = [(p/face_cof) + position for p in convert_points(face.all_points)]
+    points = [p + position for p in convert_points(face.all_points, point0, cof=30/face_cof)]
     normals = [create_normal(vec(face.all_points[p1]), vec(face.all_points[p2]), vec(face.all_points[p3])) * 500
                for p1, p2, p3 in surfaces]
     normals = [v if v.z > 0 else -v for v in normals]
+    surfaces += surfaces
+    normals += [-v for v in normals]
     face3d = Object3d(None, (0, 0, 0), points, FACEMESH_TESSELATION, surfaces, normals=normals, colors=colors)
 
     # points_left = convert_points([face.all_points[i] for i in LEFT_IRIS_SURFACES])
@@ -114,6 +115,7 @@ def update_keys(camera, elapsed_time):
 start_position = Vector3(0, 118, 0)
 
 
+
 def main():
     pg.init()
     W, H = pg.display.Info().current_w, pg.display.Info().current_h
@@ -123,9 +125,10 @@ def main():
 
     # obj = load_object_from_fileobj(None, (0, 10, 0), "bedroom0.obj", scale=1)
     obj = load_object_from_fileobj(None, (0, 0, 15), "bedroom1.obj", scale=1)
+    tab = load_object_from_fileobj(None, (0, 0, 15), "table.obj", scale=1, color=RED)
     # obj = VertexPoint(None, (0, -5, 0))
     cube_w = create_cube(None, Vector3(0, 0, 0), 1, color=GREEN)
-    objects = [obj, cube_w]
+    objects = [obj, tab, cube_w]
     scene3d = Scene3D()
     scene3d.add_static(objects)
     camera3d = Camera(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), background=(10, 10, 10))
@@ -155,16 +158,17 @@ def main():
         if face.all_points:
             angle, pos0, face_cof = face2pos(face.all_points, base_point, base_dist_eyes, in_degrees=False)
             eyes_dist = get_eyes_dist(face.all_points)
-            print("e", eyes_dist*100)
+            print("e", pos0)
             # obj.set_rotation(Vector3(((angle[0] - pi2), -(angle[1] - pi2), 0)))
             # print(x_angle, -(x_angle - pi / 2))
             # a = [p.z for p in face.all_points]
             # print(sum(a)/len(a), min(a), max(a))
-            draw_face3d(scene3d, pos0 + start_position, face, face_cof, objects)
+            draw_face3d(scene3d, pos0 + start_position, face, pos0, face_cof, objects)
         camera3d_.eye_position = Vector3(-pos0.x * 100, -pos0.y * 100, camera3d_.eye_position.z)
         cube_w.position = camera3d_.get_window_pos()
         # print(camera3d_.eye_position)
         producer.show()
+
         # draw_face(screen, face)
 
         # p = Vector2(300, 500)

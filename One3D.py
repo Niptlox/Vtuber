@@ -10,11 +10,11 @@ delta_rotation = math.pi / 18
 
 NUMPY_POINT = False
 
-SHOW_EDGES = True
-SHOW_POINTS = True
+SHOW_EDGES = False
+SHOW_POINTS = False
 SHOW_POINTS |= SHOW_EDGES
 SHOW_POLYGONS = True
-SHOW_NORMALS = True
+SHOW_NORMALS = False
 IGNOR_NORMAL = False
 
 NORMAL_COF = 15
@@ -655,7 +655,7 @@ def get_color_of_light(color, light):
         max(MIN_LIGHT, min(255, color[2] * light))
 
 
-DEF_LAMPS = [Vector3(-0.5, -1, 0.75).normalize()]
+DEF_LAMPS = [Vector3(-0.5, 1, 0.75).normalize()]
 
 
 def get_light_of_lamps(surface_normal, lamps):
@@ -1116,11 +1116,12 @@ def convert_faces_to_lines(faces):
     return lines
 
 
-def load_object_from_fileobj(owner, position, path, scale=1, flag=0):
+def load_object_from_fileobj(owner, position, path, scale=1, flag=0, color=WHITE):
     vertexes, faces, normals = open_file_obj(path, scale, _convert_faces_to_lines=False)
     print(f"Load model: {path}, vertexes: {len(vertexes)}, faces: {len(faces)}, normals: {len(normals)}")
     edges = []
-    obj = Object3d(owner, position, vertexes, edges, faces, normals, flag=flag)
+    colors = [color] * len(faces)
+    obj = Object3d(owner, position, vertexes, edges, faces, normals, flag=flag, colors=colors)
     return obj
 
 

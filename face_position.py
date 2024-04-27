@@ -7,12 +7,12 @@ from numpy import arccos, pi
 
 from face_mesh_connections import NUM_LEFT_EYE, NUM_RIGHT_EYE
 
-DEFAULT_DIST_TO_FACE = -50/10
+DEFAULT_DIST_TO_FACE = 50/10
 
 
 def face2pos(all_points, base_point, base_eyes, in_degrees=True):
     cf = get_face_cof(all_points, base_eyes)
-    z = DEFAULT_DIST_TO_FACE / cf
+    z = DEFAULT_DIST_TO_FACE / cf * base_eyes
     base = (Vector3(all_points[0].x, all_points[0].y, z) - base_point)
     vec = base.normalize()
     horizontal_angle = arccos(vec.y)

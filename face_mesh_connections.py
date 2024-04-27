@@ -15,6 +15,7 @@
 from collections import defaultdict
 
 NUM_TOP = 10
+NUM_CENTER = 8
 NUM_BOTTOM = 152
 NUM_LEFT_EYE_TOP = 386
 NUM_LEFT_EYE_BOTTOM = 374

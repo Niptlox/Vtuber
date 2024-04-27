@@ -1,6 +1,6 @@
 import math
 from cmath import pi
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 from pygame import Vector2
@@ -8,15 +8,17 @@ from pygame import Vector2
 import pygame as pg
 
 from One3D import Producer, Camera, Scene3D, create_cube, BLACK, Vector3, OBJECT_FLAG_MAP, Object3d, create_normal, \
-    convert_faces_to_lines, WHITE, RED, VertexPoint, load_object_from_fileobj, GREEN, BLUE
+    convert_faces_to_lines, WHITE, RED, VertexPoint, load_object_from_fileobj, GREEN, BLUE, create_sys_coord
 from face import Face
 from face_mesh import get_face_points, get_frame, init_cam, get_face
-from face_mesh_connections import FACEMESH_TESSELATION, FACEMESH_SURFACES, LEFT_IRIS_SURFACES, RIGHT_IRIS_SURFACES
+from face_mesh_connections import FACEMESH_TESSELATION, FACEMESH_SURFACES, LEFT_IRIS_SURFACES, RIGHT_IRIS_SURFACES, \
+    NUM_CENTER
 from face_position import face2pos, get_base, get_eyes_dist
 from main import draw_face
 
 # screen = pg.display.set_mode((780, 420))
 pi2 = pi / 2
+DEFAULT_BETWEEN_EYES = 0.20
 
 
 class WindowCamera3D(Camera):
@@ -48,23 +50,26 @@ def vec(point):
 
 
 def convert_points(points, point0, cof=30):
-    p0x, p0y, p0z = points[0].x, points[0].y, points[0].z
-    return [(point0+(p.x-p0x, p.y-p0y, p.z-p0z))*-cof for p in points]
+    p0x, p0y, p0z = points[NUM_CENTER].x, points[NUM_CENTER].y, points[NUM_CENTER].z
+    return [(point0 + (p.x - p0x, p.y - p0y, p.z - p0z)) * -cof for p in points]
 
 
 colors = [BLUE] * len(FACEMESH_SURFACES) + [RED] * (len(LEFT_IRIS_SURFACES) * 2)
+
+DUBL = False
 
 
 def draw_face3d(scene3d: Scene3D, position, face: Face, point0, face_cof, objects):
     if not face.all_points:
         return
     surfaces = FACEMESH_SURFACES + RIGHT_IRIS_SURFACES + LEFT_IRIS_SURFACES
-    points = [p + position for p in convert_points(face.all_points, point0, cof=30/face_cof)]
+    points = [p + position for p in convert_points(face.all_points, point0, cof=30 / face_cof)]
     normals = [create_normal(vec(face.all_points[p1]), vec(face.all_points[p2]), vec(face.all_points[p3])) * 500
                for p1, p2, p3 in surfaces]
     normals = [v if v.z > 0 else -v for v in normals]
-    surfaces += surfaces
-    normals += [-v for v in normals]
+    if DUBL:
+        surfaces += surfaces
+        normals += [-v for v in normals]
     face3d = Object3d(None, (0, 0, 0), points, FACEMESH_TESSELATION, surfaces, normals=normals, colors=colors)
 
     # points_left = convert_points([face.all_points[i] for i in LEFT_IRIS_SURFACES])
@@ -73,6 +78,8 @@ def draw_face3d(scene3d: Scene3D, position, face: Face, point0, face_cof, object
     scene3d.static = [face3d]
     if objects:
         scene3d.static += objects
+
+    return points[NUM_CENTER]
 
     # face3d.show(camera, None)
 
@@ -110,9 +117,38 @@ def update_keys(camera, elapsed_time):
     camera.position = camera.position + vec_speed * speed
     if keys[pg.K_0]:
         camera.position = start_position
+        camera.set_rotation(Vector3(0, 0, 0))
 
 
 start_position = Vector3(0, 118, 0)
+
+
+def draw_lines(camera: Camera, points1, points2, color=GREEN):
+    for p1 in points1:
+        if isinstance(p1, VertexPoint):
+            p1 = p1.position
+        for p2 in points2:
+            r1, r2 = camera.calc_point(Vector3(p1)), camera.calc_point(p2.global_position)
+            if r1[2] and r2[2]:
+                pg.draw.line(camera.surface, color, r1[0], r2[0], 1)
+
+
+def processing_window(camera, sys_coord: "System coord obj", point0: Vector3, objects: List[Object3d], color=BLUE):
+    for obj in objects:
+        for p_ in obj.points:
+            p = p_.global_position
+            f = abs(sys_coord.position.z - point0.z)
+            d = abs(p.z - point0.z)
+            k = f / d
+            vec = p - point0
+            np = vec * k + point0
+            res_np = camera.calc_point(np)
+            if res_np[2]:
+                if sys_coord.position.x <= np.x <= (sys_coord.position.x + sys_coord.x_length) and \
+                        sys_coord.position.y <= np.y <= (sys_coord.position.y + sys_coord.y_length):
+                    pg.draw.circle(camera.surface, color, res_np[0], 3)
+                # else:
+                #     pg.draw.circle(camera.surface, RED, res_np[0], 3)
 
 
 
@@ -124,30 +160,33 @@ def main():
     running = True
 
     # obj = load_object_from_fileobj(None, (0, 10, 0), "bedroom0.obj", scale=1)
-    obj = load_object_from_fileobj(None, (0, 0, 15), "bedroom1.obj", scale=1)
+    room = load_object_from_fileobj(None, (0, 0, 15), "bedroom1.obj", scale=1)
     tab = load_object_from_fileobj(None, (0, 0, 15), "table.obj", scale=1, color=RED)
     # obj = VertexPoint(None, (0, -5, 0))
-    cube_w = create_cube(None, Vector3(0, 0, 0), 1, color=GREEN)
-    objects = [obj, tab, cube_w]
+    cube_w = create_cube(None, Vector3(0, 0, 0), 10, color=GREEN)
+    sys3d = create_sys_coord(None, Vector3(-30, 100, 15), (60, 34, 10), 1)
     scene3d = Scene3D()
-    scene3d.add_static(objects)
+    scene3d.add_static([room, tab, sys3d, cube_w])
+    objects = list(scene3d.static)
     camera3d = Camera(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), background=(10, 10, 10))
     camera3d_ = WindowCamera3D(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), background=None, a=0)
-    obj = create_cube(camera3d_, (0, -0, 0), 10, color=GREEN)
+    # obj = create_cube(camera3d_, (0, -0, 0), 10, color=GREEN)
 
     producer = Producer()
     producer.add_camera(camera3d)
-    # producer.add_camera(camera3d_)
+    producer.add_camera(camera3d_)
 
     cam = init_cam(0)
     base_point, base_dist_eyes = get_base(get_face_points(get_frame(cam)))
-
+    if DEFAULT_BETWEEN_EYES:
+        base_dist_eyes = DEFAULT_BETWEEN_EYES
     vec0 = pg.Vector2(100, 100)
     vec1 = pg.Vector2(0, 50)
 
     clock = pg.time.Clock()
 
     while running:
+        screen.fill((0,0,0))
         elaps = clock.tick(60)
         # print(clock.get_fps())
         update_keys(camera3d, elaps)
@@ -158,16 +197,19 @@ def main():
         if face.all_points:
             angle, pos0, face_cof = face2pos(face.all_points, base_point, base_dist_eyes, in_degrees=False)
             eyes_dist = get_eyes_dist(face.all_points)
-            print("e", pos0)
+            # print("e", pos0)
             # obj.set_rotation(Vector3(((angle[0] - pi2), -(angle[1] - pi2), 0)))
             # print(x_angle, -(x_angle - pi / 2))
             # a = [p.z for p in face.all_points]
             # print(sum(a)/len(a), min(a), max(a))
-            draw_face3d(scene3d, pos0 + start_position, face, pos0, face_cof, objects)
+            lob = draw_face3d(scene3d, pos0 + start_position, face, pos0, face_cof, objects)
         camera3d_.eye_position = Vector3(-pos0.x * 100, -pos0.y * 100, camera3d_.eye_position.z)
-        cube_w.position = camera3d_.get_window_pos()
+        # cube_w.position = camera3d_.get_window_pos()
         # print(camera3d_.eye_position)
         producer.show()
+
+        draw_lines(camera3d, [lob], room.points)
+        processing_window(camera3d, sys3d, Vector3(lob), [room, tab], )
 
         # draw_face(screen, face)
 

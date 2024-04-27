@@ -193,7 +193,7 @@ def draw_points_face(vid):
 
     if all_points:
         for i, p in enumerate(all_points):
-            if i in arrrrr:
+            if i in arrrrr or 1:
                 pos = int(p.x * width), int(p.y * height)
                 cv2.circle(frame, pos, 1, (0, 0, 0), 2)
                 cv2.putText(frame, str(i), pos, 0, 0.3, (0, 200, 0))
@@ -209,7 +209,7 @@ def draw_points_face(vid):
 
 if __name__ == '__main__':
     DEBUG_CAM_IS_IMG = 0
-    TYP = 0
+    TYP = 1
     t = time.time()
     cam = init_cam(0)
     if TYP == 0:

@@ -10,7 +10,7 @@ delta_rotation = math.pi / 18
 
 NUMPY_POINT = False
 
-SHOW_EDGES = False
+SHOW_EDGES = True
 SHOW_POINTS = False
 SHOW_POINTS |= SHOW_EDGES
 SHOW_POLYGONS = True
@@ -19,6 +19,7 @@ IGNOR_NORMAL = False
 
 NORMAL_COF = 15
 MIN_LIGHT = 35
+MIN_LIGHT_ = 0.15
 
 ## изменяется при переходе к следующему состоянию сцены
 ## равен сумме
@@ -651,11 +652,11 @@ def create_normal(p0: Vector3, p1, p2):
 
 
 def get_color_of_light(color, light):
-    return max(MIN_LIGHT, min(255, color[0] * light)), max(MIN_LIGHT, min(255, color[1] * light)), \
-        max(MIN_LIGHT, min(255, color[2] * light))
+    return max(color[0]*MIN_LIGHT_, min(255, color[0] * light)), max(color[1]*MIN_LIGHT_, min(255, color[1] * light)), \
+        max(color[2]*MIN_LIGHT_, min(255, color[2] * light))
 
 
-DEF_LAMPS = [Vector3(-0.5, 1, 0.75).normalize()]
+DEF_LAMPS = [Vector3(-0.5, -1, -0.75).normalize()]
 
 
 def get_light_of_lamps(surface_normal, lamps):
@@ -811,7 +812,8 @@ def init_points_from_lst(owner, points_lst, flag):
 
 
 class Object3d(None3D):
-    def __init__(self, owner, position, points_lst, edges, faces=[], normals=[], rotation=(0, 0, 0), flag=0, colors=[]):
+    def __init__(self, owner, position, points_lst=(), edges=(), faces=(), normals=(), rotation=(0, 0, 0), flag=0,
+                 colors=[]):
         super().__init__(owner, Vector3(position), flag)
         self.color = WHITE
         self._global_position = Vector3(position)
@@ -821,7 +823,7 @@ class Object3d(None3D):
         self.max_radius2 = max(
             [(self.position - pnt.position).length_squared() for pnt in self.points]) if self.points else 0
         self.ext_points = []
-        self.edges = edges
+        self.edges = list(edges)
         self.faces = list(faces)
         self.normals = list(normals)
 
@@ -1023,7 +1025,7 @@ def create_cube(owner, position, size, flag=0, color=WHITE):
     return create_box(owner, position, (size, size, size), flag, color=color)
 
 
-def create_box(owner, position, size3, flag=0, color=WHITE):
+def create_box(owner, position, size3, flag=0, color=WHITE, no_faces=False):
     hx, hy, hz = (Vector3(size3) / 2).xyz
     if flag & OBJECT_FLAG_MAP:
         x, y, z = Vector3(position).xyz
@@ -1040,20 +1042,27 @@ def create_box(owner, position, size3, flag=0, color=WHITE):
         (x + hx, y - hy, z + hz),
         (x, y, z), ]
 
-    if color is None:
-        faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 2, 6, 5), (3, 2, 6, 7), (0, 3, 7, 4)]
-        colors = [color] * len(faces)
-        edges = convert_faces_to_lines(faces)
-    else:
+    faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 2, 6, 5), (3, 2, 6, 7), (0, 3, 7, 4)]
+    colors = [color] * len(faces)
+    edges = [(0, 1), (1, 2), (2, 3), (3, 0), (7, 6), (6, 5), (5, 4), (4, 7)]
+    if no_faces:
         faces = []
-        colors = []
-        edges = [(0, 1), (1, 2), (2, 3), (3, 0),
-                 (7, 6), (6, 5), (5, 4), (4, 7), ]
     normals = [(0, 1, 0), (0, -1, 0), (-1, 0, 0), (0, 0, -1), (1, 0, 0), (0, 0, 1)]
     # faces = [(1, 2, 6, 5)]
     # normals = [(0, 0, -1)]
 
     return Object3d(owner, position, points3, edges, faces, normals, flag=flag, colors=colors)
+
+
+def create_sys_coord(owner, position, length, width, colors=(RED, GREEN, BLUE)):
+    obj = Object3d(owner, position)
+    if isinstance(length, (float, int)):
+        length = length, length, length
+    box_x = create_box(obj, Vector3(length[0] / 2, 0, 0), Vector3(length[0], width, width), color=colors[0])
+    box_y = create_box(obj, Vector3(0, length[1] / 2, 0), Vector3(width, length[1], width), color=colors[1])
+    box_z = create_box(obj, Vector3(0, 0, length[2] / 2), Vector3(width, width, length[2]), color=colors[2])
+    obj.x_length, obj.y_length, obj.z_length = length
+    return obj
 
 
 def open_file_obj(path, scale=1, _convert_faces_to_lines=False, ):
@@ -1130,12 +1139,15 @@ class Scene3D(object):
         self.static: List[Object3d] = []
         self.lamps = []
 
-    def add_static(self, obj: Object3d|List[Object3d]):
+    def add_static(self, obj: Object3d | List[Object3d], auto_add_children=True):
         if isinstance(obj, (list, tuple)):
             for obj_ in obj:
-                self.static.append(obj_)
+                self.add_static(obj_)
         else:
             self.static.append(obj)
+            if auto_add_children and obj.children:
+                for obj_ in obj.children:
+                    self.add_static(obj_)
 
     def show(self, camera):
         for obj in self.static:

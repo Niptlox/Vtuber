@@ -5,7 +5,7 @@ from pygame import Vector3, Vector2
 from face import Face
 from numpy import arccos, pi
 
-from face_mesh_connections import NUM_LEFT_EYE, NUM_RIGHT_EYE
+from face_mesh_connections import NUM_LEFT_EYE, NUM_RIGHT_EYE, NUM_CENTER
 
 DEFAULT_DIST_TO_FACE = 50/10
 
@@ -38,4 +38,4 @@ def get_eyes_dist(all_points):
 
 def get_base(all_points) -> Tuple[Vector3, float]:
     # return Vector3(0.5,0.5,0.5)
-    return Vector3(all_points[0].x, all_points[0].y, 0.5), get_eyes_dist(all_points)
+    return Vector3(all_points[NUM_CENTER].x, all_points[NUM_CENTER].y, 0.5), get_eyes_dist(all_points)

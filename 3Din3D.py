@@ -13,33 +13,36 @@ from face import Face
 from face_mesh import get_face_points, get_frame, init_cam, get_face
 from face_mesh_connections import FACEMESH_TESSELATION, FACEMESH_SURFACES, LEFT_IRIS_SURFACES, RIGHT_IRIS_SURFACES, \
     NUM_CENTER
-from face_position import face2pos, get_base, get_eyes_dist
+from face_position import face2pos, get_base, get_eyes_dist, DEFAULT_DIST_TO_FACE, add_ddtf, FACE_COF
 from main import draw_face
 
 # screen = pg.display.set_mode((780, 420))
 pi2 = pi / 2
-DEFAULT_BETWEEN_EYES = 0.20
+DEFAULT_BETWEEN_EYES = 0
+TYP = 1
 
 
 class WindowCamera3D(Camera):
-    def __init__(self, owner, scene, screen, position, rotation, background=(10, 10, 10), a=0):
+    def __init__(self, owner, scene, screen, position, rotation, sys_coord, background=(10, 10, 10)):
         super().__init__(owner, scene, screen, position, rotation, background=background)
+        self.sys_coord = sys_coord
         self.eye_position = Vector3(0, 0, 0)
-        self.window_position = Vector3(0, 0, a)
 
     def calc_point(self, global_position) -> Tuple[Tuple[float, float], float, bool]:
-        position_from_camera = global_position - self.global_position
-        vec_at_center = self.get_matrix_rotation() * position_from_camera
-        vec_at_eye = vec_at_center - self.eye_position
-        dist = vec_at_eye[2]
-        if dist == 0:
-            dist = 1e-9
-        eye_at_win = self.eye_position - self.window_position
-        focus = self.window_position.z - self.eye_position.z
-        x = (focus * vec_at_eye[0] / dist + eye_at_win.x) + self.half_w
-        y = self.half_h - (focus * vec_at_eye[1] / dist + eye_at_win.y)
-        is_visible = self.surface_rect.collidepoint((x, y)) and dist > 0
-        return (x, y), dist, is_visible
+        p = global_position
+        f = abs(self.sys_coord.position.z - self.eye_position.z)
+        d = abs(p.z - self.eye_position.z)
+        if d == 0:
+            d = 1e-9
+        k = f / d
+        vec = p - self.eye_position
+        np = vec * k + self.eye_position
+        # =====
+        jx, jy = np.x - self.sys_coord.position.x, np.y - self.sys_coord.position.y
+        x, y = jx / self.sys_coord.x_length * self.width, self.height - jy / self.sys_coord.y_length * self.height
+        dist = p.z - self.sys_coord.position.z
+        is_visible = dist > 0 and self.surface_rect.collidepoint(x, y)
+        return (x, y), d, is_visible
 
     def get_window_pos(self):
         return self.global_position + self.window_position
@@ -51,19 +54,19 @@ def vec(point):
 
 def convert_points(points, point0, cof=30):
     p0x, p0y, p0z = points[NUM_CENTER].x, points[NUM_CENTER].y, points[NUM_CENTER].z
-    return [(point0 + (p.x - p0x, p.y - p0y, p.z - p0z)) * -cof for p in points]
+    return [point0 + (Vector3(p.x - p0x, p.y - p0y, p.z - p0z) * -cof) for p in points]
 
 
 colors = [BLUE] * len(FACEMESH_SURFACES) + [RED] * (len(LEFT_IRIS_SURFACES) * 2)
 
-DUBL = False
+DUBL = 1
 
 
 def draw_face3d(scene3d: Scene3D, position, face: Face, point0, face_cof, objects):
     if not face.all_points:
         return
     surfaces = FACEMESH_SURFACES + RIGHT_IRIS_SURFACES + LEFT_IRIS_SURFACES
-    points = [p + position for p in convert_points(face.all_points, point0, cof=30 / face_cof)]
+    points = [p + position for p in convert_points(face.all_points, point0, cof=FACE_COF / face_cof)]
     normals = [create_normal(vec(face.all_points[p1]), vec(face.all_points[p2]), vec(face.all_points[p3])) * 500
                for p1, p2, p3 in surfaces]
     normals = [v if v.z > 0 else -v for v in normals]
@@ -114,10 +117,26 @@ def update_keys(camera, elapsed_time):
         vec_speed += Vector3(0, -1, 0)
     if keys[pg.K_e]:
         vec_speed += Vector3(0, 1, 0)
+    global TYP
+    if keys[pg.K_1]:
+        set_typ_view(1)
+    if keys[pg.K_2]:
+        set_typ_view(2)
     camera.position = camera.position + vec_speed * speed
     if keys[pg.K_0]:
         camera.position = start_position
         camera.set_rotation(Vector3(0, 0, 0))
+
+
+def set_typ_view(typ):
+    global TYP
+    TYP = typ
+    if TYP == 1:
+        camera3d_.active = False
+        camera3d.active = True
+    else:
+        camera3d_.active = True
+        camera3d.active = False
 
 
 start_position = Vector3(0, 118, 0)
@@ -151,8 +170,8 @@ def processing_window(camera, sys_coord: "System coord obj", point0: Vector3, ob
                 #     pg.draw.circle(camera.surface, RED, res_np[0], 3)
 
 
-
 def main():
+    global camera3d, camera3d_
     pg.init()
     W, H = pg.display.Info().current_w, pg.display.Info().current_h
     print(W, H)
@@ -160,7 +179,7 @@ def main():
     running = True
 
     # obj = load_object_from_fileobj(None, (0, 10, 0), "bedroom0.obj", scale=1)
-    room = load_object_from_fileobj(None, (0, 0, 15), "bedroom1.obj", scale=1)
+    room = load_object_from_fileobj(None, (0, 0, 15), "bedroom.obj", scale=1)
     tab = load_object_from_fileobj(None, (0, 0, 15), "table.obj", scale=1, color=RED)
     # obj = VertexPoint(None, (0, -5, 0))
     cube_w = create_cube(None, Vector3(0, 0, 0), 10, color=GREEN)
@@ -169,13 +188,13 @@ def main():
     scene3d.add_static([room, tab, sys3d, cube_w])
     objects = list(scene3d.static)
     camera3d = Camera(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), background=(10, 10, 10))
-    camera3d_ = WindowCamera3D(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), background=None, a=0)
+    camera3d_ = WindowCamera3D(None, scene3d, screen, Vector3(start_position), Vector3(0, 0, 0), sys3d, background=None)
     # obj = create_cube(camera3d_, (0, -0, 0), 10, color=GREEN)
 
     producer = Producer()
     producer.add_camera(camera3d)
     producer.add_camera(camera3d_)
-
+    set_typ_view(TYP)
     cam = init_cam(0)
     base_point, base_dist_eyes = get_base(get_face_points(get_frame(cam)))
     if DEFAULT_BETWEEN_EYES:
@@ -186,7 +205,7 @@ def main():
     clock = pg.time.Clock()
 
     while running:
-        screen.fill((0,0,0))
+        screen.fill((0, 0, 0))
         elaps = clock.tick(60)
         # print(clock.get_fps())
         update_keys(camera3d, elaps)
@@ -202,14 +221,16 @@ def main():
             # print(x_angle, -(x_angle - pi / 2))
             # a = [p.z for p in face.all_points]
             # print(sum(a)/len(a), min(a), max(a))
-            lob = draw_face3d(scene3d, pos0 + start_position, face, pos0, face_cof, objects)
-        camera3d_.eye_position = Vector3(-pos0.x * 100, -pos0.y * 100, camera3d_.eye_position.z)
+            lob = draw_face3d(scene3d, start_position, face, pos0, face_cof, objects)
+            print(int(lob.z), face_cof)
+            camera3d_.eye_position = Vector3(lob)
         # cube_w.position = camera3d_.get_window_pos()
         # print(camera3d_.eye_position)
         producer.show()
 
-        draw_lines(camera3d, [lob], room.points)
-        processing_window(camera3d, sys3d, Vector3(lob), [room, tab], )
+        if TYP == 1:
+            draw_lines(camera3d, [lob], tab.points)
+            processing_window(camera3d, sys3d, Vector3(lob), [tab], )
 
         # draw_face(screen, face)
 
@@ -226,7 +247,6 @@ def main():
         # pg.draw.line(screen, "yellow", vec0, vec0 + vec2)
         # print(vec1.normalize().dot(vec2.normalize()))
         #  ============== END DOT ================
-
         pg.display.flip()
 
 

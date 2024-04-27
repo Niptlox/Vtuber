@@ -7,13 +7,22 @@ from numpy import arccos, pi
 
 from face_mesh_connections import NUM_LEFT_EYE, NUM_RIGHT_EYE, NUM_CENTER
 
-DEFAULT_DIST_TO_FACE = 50/10
+DEFAULT_DIST_TO_FACE = 50
+FACE_COF = 20
+
+
+def add_ddtf(v):
+    global DEFAULT_DIST_TO_FACE
+    DEFAULT_DIST_TO_FACE += v
+    print("DEFAULT_DIST_TO_FACE", DEFAULT_DIST_TO_FACE)
 
 
 def face2pos(all_points, base_point, base_eyes, in_degrees=True):
     cf = get_face_cof(all_points, base_eyes)
-    z = DEFAULT_DIST_TO_FACE / cf * base_eyes
-    base = (Vector3(all_points[0].x, all_points[0].y, z) - base_point)
+    z = DEFAULT_DIST_TO_FACE / cf
+    # print(int(z), cf)
+    base = (Vector3(all_points[0].x, all_points[0].y, 0) - base_point) * -FACE_COF
+    base.z = -z
     vec = base.normalize()
     horizontal_angle = arccos(vec.y)
     vertical_angle = arccos(vec.x)
